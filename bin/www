@@ -1,0 +1,416 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+const { User, Workspace } = require("../models/index.js");
+const { AsyncLocalStorage } = require("async_hooks");
+var app = require("../app");
+var debug = require("debug")("backend-expressjs:server");
+var http = require("http");
+const { Server } = require("socket.io");
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || "3000");
+app.set("port", port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Hoặc bạn có thể cung cấp URL cụ thể của máy chủ web của bạn
+  },
+});
+// Sự kiện kết nối mới
+let onlineUsers = [];
+
+const addNewUser = (body) => {
+  const { id, socketId } = body;
+  if (!id || !socketId) return;
+  !onlineUsers.some((user) => +user.id === +id) && onlineUsers.push(body);
+};
+
+const removeUser = (socketId) => {
+  onlineUsers = onlineUsers.filter((user) => user.socketId !== socketId);
+};
+
+const getUser = (id) => {
+  return onlineUsers.find((user) => +user.id === +id || user.socketId === id);
+};
+
+const updateUser = (incomingUser) => {
+  const user = onlineUsers.find(
+    (u) => +u.id === +incomingUser?.id || u.socketId === incomingUser?.socketId
+  );
+
+  if (user) {
+    Object.keys(incomingUser).forEach((key) => {
+      user[key] = incomingUser[key];
+    });
+  }
+};
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+console.log(onlineUsers);
+
+io.on("connection", (socket) => {
+  socket.on("newUser", (userOnl) => {
+    if (!userOnl) return;
+
+    // Thêm người dùng mới vào danh sách online
+    addNewUser({
+      socketId: socket.id,
+      ...userOnl,
+    });
+
+    // Phát sự kiện thông báo trạng thái người dùng
+    socket.broadcast.emit("getStatusUser", userOnl);
+  });
+
+  socket.on("inviteUser", async (body) => {
+    const { userInvite, userInvited } = body;
+
+    if (!userInvited || !userInvite) return;
+
+    const usersWorkspace = onlineUsers.filter(
+      (user) =>
+        +user.workspace_id_active === +userInvite.workspace_id_active &&
+        +user.id !== +userInvite.id
+    );
+
+    if (usersWorkspace.length) {
+      const socketIds = usersWorkspace.map((user) => user.socketId);
+
+      io.to(socketIds).emit("getUserWorkspace", {
+        user: userInvited,
+        type: "invite_user",
+      });
+    }
+    const userInvitedOnl = getUser(userInvited.id);
+
+    if (userInvitedOnl) {
+      const workspace = await Workspace.findByPk(
+        userInvite.workspace_id_active
+      );
+
+      workspace.dataValues.role = userInvited.role;
+
+      io.to(userInvitedOnl.socketId).emit("getUserWorkspace", {
+        workspace,
+        user: userInvited,
+        type: "invite_user",
+      });
+    }
+  });
+
+  socket.on("removeUser", async (body) => {
+    const { userAction, userRemove } = body;
+
+    if (!userRemove || !userAction) return;
+
+    const usersWorkspace = onlineUsers.filter(
+      (user) =>
+        (+user.workspace_id_active === +userAction.workspace_id_active &&
+          +user.id !== +userAction.id) ||
+        +user.id === +userRemove.id
+    );
+
+    if (usersWorkspace.length) {
+      const socketIds = usersWorkspace.map((user) => user.socketId);
+
+      io.to(socketIds).emit("getUserWorkspace", {
+        workspace: { id: userAction.workspace_id_active },
+        user: userRemove,
+        type: "remove_user",
+      });
+    }
+  });
+  socket.on("updateWorkspace", async (form) => {
+    if (!form) return;
+
+    const userAction = getUser(socket.id);
+
+    if (!userAction) return;
+
+    const users = onlineUsers.filter(
+      (user) =>
+        +user.workspace_id_active === +userAction.workspace_id_active &&
+        +user.id !== +userAction.id
+    );
+
+    if (users.length) {
+      const socketIds = users.map((user) => user.socketId);
+
+      io.to(socketIds).emit("getWorkspaceUpdated", form);
+    }
+  });
+  socket.on("changeWorkspace", async (data) => {
+    const { workspace_id_active } = data;
+    if (!workspace_id_active) return;
+
+    updateUser({
+      socketId: socket.id,
+      workspace_id_active,
+    });
+  });
+  socket.on("deleteWorkspace", async (data) => {
+    const { workspace_id_new } = data;
+    if (!workspace_id_new) return;
+
+    const workspace_id = getUser(socket.id)?.workspace_id_active;
+
+    if (!workspace_id) return;
+
+    updateUser({ socketId: socket.id, workspace_id_active: workspace_id_new });
+
+    socket.broadcast.emit("resultDeleteWorkspace", {
+      workspace_id,
+    });
+  });
+  socket.on("updateBoard", async (form) => {
+    if (!form) return;
+
+    const userAction = getUser(socket.id);
+
+    if (!userAction) return;
+
+    const users = onlineUsers.filter(
+      (user) =>
+        +user.board_id === +userAction.board_id && +user.id !== +userAction.id
+    );
+
+    if (users.length) {
+      const socketIds = users.map((user) => user.socketId);
+
+      io.to(socketIds).emit("getBoardUpdated", form);
+    }
+  });
+  socket.on("deleteBoard", async (data) => {
+    const { workspace_id, board_id } = data;
+
+    if (!workspace_id || !board_id) return;
+
+    updateUser({ socketId: socket.id, board_id: null });
+
+    const users = onlineUsers.filter(
+      (user) =>
+        +user.workspace_id_active === +workspace_id &&
+        +user.socketId !== +socket.id
+    );
+
+    if (users.length) {
+      const socketIds = users.map((user) => user.socketId);
+
+      io.to(socketIds).emit("resultDeleteBoard", { board_id });
+    }
+  });
+  socket.on("updateCard", async (form) => {
+    if (!form) return;
+
+    const userAction = getUser(socket.id);
+
+    if (!userAction) return;
+
+    const users = onlineUsers.filter(
+      (user) =>
+        +user.board_id === +userAction.board_id && +user.id !== +userAction.id
+    );
+
+    if (users.length) {
+      const socketIds = users.map((user) => user.socketId);
+
+      io.to(socketIds).emit("getCardUpdated", form);
+    }
+  });
+  socket.on("deleteCard", async (form) => {
+    if (!form) return;
+
+    const userAction = getUser(socket.id);
+
+    if (!userAction) return;
+
+    const users = onlineUsers.filter(
+      (user) =>
+        +user.board_id === +userAction.board_id && +user.id !== +userAction.id
+    );
+
+    if (users.length) {
+      const socketIds = users.map((user) => user.socketId);
+
+      io.to(socketIds).emit("resultDeleteCard", form);
+    }
+  });
+
+  socket.on("actionMission", async (form) => {
+    const { type, missionUpdate, user_id } = form;
+    if (!user_id || !missionUpdate || !type) return;
+
+    const userAction = getUser(user_id);
+
+    if (!userAction) return;
+
+    io.to(userAction.socketId).emit("getActionMission", form);
+  });
+  socket.on("sendNotification", async (body) => {
+    const { user_id, notification } = body;
+
+    if (!user_id || !notification) return;
+
+    const receiver = getUser(user_id);
+
+    if (receiver) {
+      io.to(receiver.socketId).emit("getNotification", {
+        user_id,
+        ...notification,
+      });
+    }
+  });
+
+  socket.on("logout", async () => {
+    const userOff = onlineUsers.find((user) => user.socketId === socket.id);
+
+    if (!userOff) return;
+
+    const boardId = userOff.board_id;
+
+    //  Xóa khỏi danh sách online
+    removeUser(socket.id);
+
+    // Thông báo trạng thái người dùng offline
+    socket.broadcast.emit("getStatusUser", { id: userOff.id, isOnline: false });
+
+    // Xử lý nếu người dùng đang ở trong board
+    if (boardId) {
+      const usersInBoard = onlineUsers.filter(
+        (user) => user.board_id === boardId
+      );
+
+      if (usersInBoard.length) {
+        const socketIds = usersInBoard.map((user) => user.socketId);
+        io.to(socketIds).emit("getUserVisitBoard", usersInBoard);
+      }
+    }
+  });
+
+  socket.on("visitBoard", async (board_id) => {
+    if (!board_id) return;
+
+    updateUser({ socketId: socket.id, board_id });
+
+    const usersVisitBoard = onlineUsers.filter(
+      (user) => +user.board_id === +board_id
+    );
+    console.log(usersVisitBoard, onlineUsers);
+
+    if (usersVisitBoard.length) {
+      const socketIds = usersVisitBoard.map((user) => user.socketId);
+
+      io.to(socketIds).emit("getUserVisitBoard", usersVisitBoard);
+    }
+  });
+
+  socket.on("outBoard", async (board_id) => {
+    if (!board_id) return;
+
+    updateUser({ socketId: socket.id, board_id: null });
+
+    const usersVisitBoard = onlineUsers.filter(
+      (user) => +user.board_id === +board_id
+    );
+
+    if (usersVisitBoard.length) {
+      const socketIds = usersVisitBoard.map((user) => user.socketId);
+
+      io.to(socketIds).emit("getUserVisitBoard", usersVisitBoard);
+    }
+  });
+  socket.on("disconnect", async () => {
+    const userOff = getUser(socket.id);
+
+    if (!userOff) return;
+    const boardId = userOff.board_id;
+    // Cập nhật trạng thái người dùng và xóa khỏi danh sách online
+    await User.update({ isOnline: false }, { where: { id: userOff.id } });
+    removeUser(socket.id);
+
+    // Thông báo trạng thái người dùng offline
+    socket.broadcast.emit("getStatusUser", { id: userOff.id, isOnline: false });
+
+    // Xử lý nếu người dùng đang ở trong board
+    if (boardId) {
+      const usersInBoard = onlineUsers.filter(
+        (user) => user.board_id === boardId
+      );
+
+      if (usersInBoard.length) {
+        const socketIds = usersInBoard.map((user) => user.socketId);
+        io.to(socketIds).emit("getUserVisitBoard", usersInBoard);
+      }
+    }
+  });
+});
+server.listen(port);
+server.on("error", onError);
+server.on("listening", onListening);
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== "listen") {
+    throw error;
+  }
+
+  var bind = typeof port === "string" ? "Pipe " + port : "Port " + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case "EACCES":
+      console.error(bind + " requires elevated privileges");
+      process.exit(1);
+      break;
+    case "EADDRINUSE":
+      console.error(bind + " is already in use");
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
+  debug("Listening on " + bind);
+}
