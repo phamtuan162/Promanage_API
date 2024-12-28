@@ -116,4 +116,5 @@ module.exports = {
     }
     res.status(response.status).json(response);
   },
+  onClick: async (req, res) => {},
 };
