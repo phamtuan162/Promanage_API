@@ -11,6 +11,7 @@ module.exports = {
     dialectOptions: {
       ssl: {
         require: true,
+        rejectUnauthorized: false,
       },
     },
     dialectModule: pg,
@@ -25,6 +26,7 @@ module.exports = {
     dialectOptions: {
       ssl: {
         require: true,
+        rejectUnauthorized: false,
       },
     },
     dialectModule: pg,
@@ -39,6 +41,7 @@ module.exports = {
     dialectOptions: {
       ssl: {
         require: true,
+        rejectUnauthorized: false,
       },
     },
     dialectModule: pg,
