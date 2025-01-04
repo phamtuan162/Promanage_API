@@ -381,7 +381,7 @@ module.exports = {
       });
 
       const notificationNew =
-        +userMain.id === +notification?.user_id
+        +userMain.id !== +notification?.user_id
           ? await Notification.create(notification)
           : null;
 
