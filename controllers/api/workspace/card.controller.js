@@ -706,7 +706,7 @@ module.exports = {
         title: card.title,
         action: "attachment_file",
         workspace_id: user.workspace_id_active,
-        desc: `đã đính kèm tập tin ${resultUpload.name} vào thẻ này`,
+        desc: `đã đính kèm tập tin ${attachment.fileName} vào thẻ này`,
       });
 
       Object.assign(response, {
