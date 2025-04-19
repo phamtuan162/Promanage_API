@@ -1,4 +1,5 @@
 const whitelist = [
+  "https://promanage-site.vercel.app",
   "https://pro-manage-xi.vercel.app",
   "http://localhost:3000",
   "https://backend-expressjs-swart.vercel.app",
