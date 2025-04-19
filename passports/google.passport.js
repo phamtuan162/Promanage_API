@@ -11,7 +11,7 @@ module.exports = new GoogleStrategy(
   {
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "https://pro-manage-xi.vercel.app/auth/login/google/callback",
+    callbackURL: "https://promanage-site.vercel.app/auth/login/google/callback",
     scope: ["profile", "email"],
   },
   async (accessToken, refreshToken, profile, cb) => {
