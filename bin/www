@@ -8,7 +8,13 @@ const { AsyncLocalStorage } = require("async_hooks");
 var app = require("../app");
 var debug = require("debug")("backend-expressjs:server");
 var http = require("http");
+// var https = require("https");
 const { Server } = require("socket.io");
+
+// var privateKey = fs.readFileSync("sslcert/server.key", "utf8");
+// var certificate = fs.readFileSync("sslcert/server.crt", "utf8");
+
+// var credentials = { key: privateKey, cert: certificate };
 
 /**
  * Get port from environment and store in Express.
@@ -22,9 +28,13 @@ app.set("port", port);
  */
 
 var server = http.createServer(app);
+// var httpsServer = https.createServer(credentials, app);
+
 const io = new Server(server, {
   cors: {
-    origin: "*", // Hoặc bạn có thể cung cấp URL cụ thể của máy chủ web của bạn
+    origin: process.env.API,
+    credentials: true,
+    methods: ["GET", "POST"],
   },
 });
 // Sự kiện kết nối mới

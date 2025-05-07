@@ -72,7 +72,7 @@ module.exports = {
             const oneHourBeforeEnd = subHours(currentTime, 1);
             const workspace = card.workspace;
             const board = card.column.board;
-            const link = `http://localhost:3000/w/${workspace.id}`;
+            const link = `${process.env.API}/w/${workspace.id}`;
 
             if (
               isBefore(oneHourBeforeEnd, card.endDateTime) &&

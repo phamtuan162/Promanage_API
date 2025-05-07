@@ -225,7 +225,7 @@ module.exports = {
         }
       );
 
-      const link = `http://localhost:3000/auth/register/verify?token=${token}`;
+      const link = `${process.env.API}/auth/register/verify?token=${token}`;
       const html = `
         <p>Xin chào,</p>
         <p>Liên kết dưới đây sẽ có tác dụng trong <strong>15 phút</strong>. Vui lòng nhấn vào liên kết để xác thực tài khoản của bạn trong khoảng thời gian đó!</p>
@@ -552,7 +552,7 @@ module.exports = {
         path: "/",
       });
 
-      const link = `http://localhost:3000/auth/reset-password?token=${token}`;
+      const link = `${process.env.API}/auth/reset-password?token=${token}`;
       const html = `
       <p>Xin chào,</p>
       <p>Bạn vừa yêu cầu làm mới mật khẩu. Vui lòng nhấn vào liên kết bên dưới trong vòng <strong>15 phút</strong> để thực hiện yêu cầu này.</p>
