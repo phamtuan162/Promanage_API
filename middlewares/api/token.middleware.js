@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { User, BlacklistToken } = require("../../models/index");
 module.exports = async (req, res, next) => {
-  const token = req.cookies?.access_token;
+  const { token } = req.query;
   const { JWT_SECRET } = process.env;
 
   if (!token) {
