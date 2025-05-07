@@ -1,2 +1,5 @@
-const whitelist = [`${process.env.API}`, "http://localhost:3000"];
+const whitelist = [
+  `https://promanage-site.vercel.app`,
+  "http://localhost:3000",
+];
 module.exports = whitelist;

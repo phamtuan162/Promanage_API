@@ -90,7 +90,7 @@ module.exports = {
         const workspace = mission.card.workspace;
         const board = mission.card.column.board;
 
-        const link = `${process.env.API}/w/${workspace.id}`;
+        const link = `https://promanage-site.vercel.app/w/${workspace.id}`;
 
         if (
           isBefore(oneHourBeforeEnd, mission.endDateTime) &&

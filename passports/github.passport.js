@@ -11,7 +11,7 @@ module.exports = new GitHubStrategy(
   {
     clientID: process.env.GITHUB_CLIENT_ID,
     clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    callbackURL: `${process.env.API}/auth/login/github/callback`,
+    callbackURL: `https://promanage-site.vercel.app/auth/login/github/callback`,
   },
   async (accessToken, refreshToken, profile, cb) => {
     try {
